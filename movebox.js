@@ -6,7 +6,7 @@
 class Arena {
   var min_x;
   var min_z;
-  var max_x; 
+  var max_x;
   var max_z;
   var center_x;
   var center_z;
@@ -15,7 +15,7 @@ class Arena {
   function Arena(arena:GameObject){
     this.min_x = arena.collider.bounds.min.x;
     this.min_z = arena.collider.bounds.min.z;
-    this.max_x = arena.collider.bounds.max.x; 
+    this.max_x = arena.collider.bounds.max.x;
     this.max_z = arena.collider.bounds.max.z;
     this.center_x = arena.collider.bounds.center.x;
     this.center_z = arena.collider.bounds.center.z;
@@ -32,7 +32,7 @@ class Player {
 
   var rigidbody : Rigidbody;
   var transform : Transform;
-  
+
   // constructor: feed it a GameObject & it grabs values
   function Player(player:GameObject) {
     rigidbody = player.rigidbody;
@@ -66,8 +66,6 @@ class State {
 enum AI_STATE { EARTH, FIRE, WATER, WIND };
 
 // variables
-var turn: boolean = false;
-var vel : boolean = false;
 var arena : Arena; // arena
 var enemy : Player; // enemy
 var states; // an array of all the states available (objects)
@@ -79,7 +77,7 @@ function Start()
   // arena values
   var arena_object = GameObject.Find("Arena");
   arena = new Arena(arena_object);
-  
+
   // ref to enemy
   var enemy_object = GameObject.Find(name == "Robot 1" ? "Robot 2" : "Robot 1");
   enemy = new Player(enemy_object);
@@ -94,7 +92,6 @@ function Start()
   states = Array();
   // EARTH state: holds center-stage at all cost
   var earth = new State( function () {
-    killRot();
     killVel();
     // find vector to center-stage
     // find required orientation change to face center
@@ -125,7 +122,7 @@ function Start()
   states.push(wind);
   // set active state on start
   active_state = AI_STATE.EARTH;
- 
+
   // debug values
   //Debug.Log("Arena Center [X,Z]: " + a.center_x + ", " + a.center_z);
   //Debug.Log("Arena Bounds: X " + a.min_x + " .. " + a.max_x + "; Z " + a.min_z + " .. " + a.max_z);
@@ -152,15 +149,16 @@ function killRot(){
 }
 
 function killVel() :  boolean{
-  if (rigidbody.velocity.magnitude!=0){
-    if (pointToVect(rigidbody.velocity, 10)){
+  if (rigidbody.velocity.magnitude>=0.01){
+    if (pointDampingToVect(rigidbody.velocity, 10)){
 
     // kill any spare rotational velocity you might have before applying force.
     killRot();
-    
+
     // in order to apply the max amount of force, but not too much so that we accelerate in the other direction, we apply a force no greater than the max.
     // To apply the most amount of force to the last second, we square the velocity.
-    var amt_v = Mathf.Pow(rigidbody.velocity.magnitude,2)>5 ? rigidbody.velocity.magnitude : Mathf.Pow(rigidbody.velocity.magnitude,2);
+    var amt_v = Mathf.Pow(rigidbody.velocity.magnitude,2)>5 ?
+    	rigidbody.velocity.magnitude : Mathf.Pow(rigidbody.velocity.magnitude,2);
     rigidbody.AddRelativeForce(0, 0, 5*amt_v*s);
   }
     return false;
@@ -169,13 +167,18 @@ function killVel() :  boolean{
     return true;
   }
 }
-
-function pointToVect(v : Vector3, a :  float) : boolean{
+function pointDampingToVect (v : Vector3, a :  float) : boolean{
+	return pointToVect(v, a, true);
+}
+function pointFastToVect (v : Vector3, a :  float) : boolean{
+	return pointToVect(v, a, false);
+}
+function pointToVect(v : Vector3, a :  float, f : boolean) : boolean{
   var velAng = Mathf.Atan2(-v.x, -v.z) * Mathf.Rad2Deg;
   // get the signed difference in these angles
   var angleDiff_a = Mathf.DeltaAngle( velAng, transform.eulerAngles.y);
   var angleDiff_b = Mathf.DeltaAngle( velAng, transform.eulerAngles.y+180);
- 
+
   var angle :  float  ;
   if(Mathf.Abs(angleDiff_a)<Mathf.Abs(angleDiff_b)){
     s = 1;
@@ -187,8 +190,8 @@ function pointToVect(v : Vector3, a :  float) : boolean{
   if (Mathf.Abs(angle)<a){
     return true;
   }
- 
-  var amt_a = Mathf.Pow(angle,2)>5 ? angle : Mathf.Pow(angle,2);
+// if fast mode is enabled, set the amount to turn by straight to 5.
+  var amt_a = f ? (Mathf.Pow(angle,2)>5 ? 5 : Mathf.Pow(angle,2)) : 5;
   if    (angle > 0) rigidbody.AddTorque(0, -amt_a, 0);
   else if (angle < 0) rigidbody.AddTorque(0, amt_a , 0);
   return false;
@@ -199,24 +202,35 @@ function pointToCoords(x: float, z : float, a: float) : boolean{
   v.x = transform.position.x - x;
   v.z = transform.position.z - z;
   v.y = transform.position.y;
-  return pointToVect(v,a);
+  return pointDampingToVect(v,a);
 }
 function pointToEnemy() : boolean{
-  //Vector v
-  var d : Vector3;
-  d.x = transform.position.x - enemy.transform.position.x;
-  d.z = transform.position.z - enemy.transform.position.z;
-  d.y = transform.position.y;
-  
-  var p = Vector3.Project(rigidbody.velocity, d) - rigidbody.velocity;
-  p += enemy.rigidbody.velocity;
- 
-  return pointToVect(d,10);
+	//Vector d, the difference between the two robots
+	var d : Vector3;
+	d.x = transform.position.x - enemy.transform.position.x;
+	d.z = transform.position.z - enemy.transform.position.z;
+	d.y = transform.position.y;
+
+	//Project velocity vector onto d.
+	var p = Vector3.Project(rigidbody.velocity, d) - rigidbody.velocity;
+//	p += enemy.rigidbody.velocity;
+	
+	//Velocity of enemy robot
+	var v = 1.5 * enemy.rigidbody.velocity * (1-Mathf.Abs(0.5-threatDetect()));
+	return pointFastToVect(d-(p*5)-v,2);
 }
 function chargeEnemy(){
   if (pointToEnemy()){
-    rigidbody.AddRelativeForce(0, 0, 5*s);
+  	killRot();
+	rigidbody.AddRelativeForce(0, 0, 5*s);
   }
+}
+function threatDetect(): float{
+	var v = (enemy.transform.position - transform.position).normalized;
+	return Vector3.Angle(v, enemy.rigidbody.velocity.normalized)/180;
+}
+function dangerDetect() : float{
+
 }
 
 ///////////////////////////////////////
@@ -306,8 +320,6 @@ function profile() {
 function Update(){
   ///////////////////////////////////////
   // INPUT
-  turn = false;
-  vel = false;
   if (Input.GetKey(KeyCode.UpArrow)){
     //killRot();
     rigidbody.AddRelativeForce(0, 0, 5);
@@ -316,24 +328,16 @@ function Update(){
   if (Input.GetKey(KeyCode.DownArrow)){
     killRot();
     rigidbody.AddRelativeForce(0, 0, -5);
-    vel = true;
   }
   if (Input.GetKey(KeyCode.LeftArrow)){
     rigidbody.AddTorque(0, -5, 0);
-    turn = true;
   }
   if (Input.GetKey(KeyCode.RightArrow)){
     rigidbody.AddTorque(0, 5, 0);
-    turn = true;
   }
   // FUNCTION TESTING
-  if (Input.GetKey(KeyCode.LeftControl)){
-    // Add torque based on the inverse of the current angular velocity
-    // ie; in the other direction to the way the robot is spinning
-    killRot();
-  }
-  if (Input.GetKey(KeyCode.Space)){
-    killVel();
+  if (Input.GetKey(KeyCode.LeftShift)){
+    Debug.Log("Threat: " + threatDetect());
   }
   // STATE SELECTION
   if (Input.GetKey(KeyCode.Alpha1) && active_state != AI_STATE.EARTH) {
@@ -351,5 +355,20 @@ function Update(){
   if (Input.GetKey(KeyCode.Alpha4) && active_state != AI_STATE.WIND) {
     active_state = AI_STATE.WIND;
     Debug.Log(active_state);
+  }
+  
+  // ENEMY CONTROL
+  if (Input.GetKey(KeyCode.W)){
+    enemy.rigidbody.AddRelativeForce(0, 0, 5);
+    vel = true;
+  }
+  if (Input.GetKey(KeyCode.S)){
+    enemy.rigidbody.AddRelativeForce(0, 0, -5);
+  }
+  if (Input.GetKey(KeyCode.A)){
+    enemy.rigidbody.AddTorque(0, -5, 0);
+  }
+  if (Input.GetKey(KeyCode.D)){
+    enemy.rigidbody.AddTorque(0, 5, 0);
   }
 }
