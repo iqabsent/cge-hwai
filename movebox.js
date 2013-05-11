@@ -104,6 +104,7 @@ function Start()
   });
   // FIRE state: attacks .. ! or fires all employees?
   var fire = new State( function () {
+    chargeEnemy();
     // find enemy
     // orientate to face enemy
     // chaaaaaaaaaaarge!
@@ -136,6 +137,7 @@ function FixedUpdate() {
   // call fixedUpdate on active state
   states[active_state].FixedUpdate();
 
+  profile();
   //Debug.Log(active_state);
 }
 
@@ -202,10 +204,10 @@ function pointToCoords(x: float, z : float, a: float) : boolean{
 function pointToEnemy() : boolean{
   //Vector v
   var d : Vector3;
-  d.x = transform.position.x - enemy.transform.x;
-  d.z = transform.position.z - enemy.transform.z;
+  d.x = transform.position.x - enemy.transform.position.x;
+  d.z = transform.position.z - enemy.transform.position.z;
   d.y = transform.position.y;
- 
+  
   var p = Vector3.Project(rigidbody.velocity, d) - rigidbody.velocity;
   p += enemy.rigidbody.velocity;
  
@@ -214,6 +216,86 @@ function pointToEnemy() : boolean{
 function chargeEnemy(){
   if (pointToEnemy()){
     rigidbody.AddRelativeForce(0, 0, 5*s);
+  }
+}
+
+///////////////////////////////////////
+// PROFILING TOOL
+// - used to record time taken to achieve certain goals
+// - set a trigger to start timer, and one to stop timer
+// - give it a name and time will be printed to console
+//
+
+// create an array to hold tasks
+var tasks = Array();
+
+///////////////////////////////////////
+// TASK CLASS
+// - creates an object with a name and test condition in tasks array
+// - time is recorded upon creation
+// - profile() function checks condition and kills the task
+// once the contition is met while printing time to console
+class Task {
+  var name;
+  var ticks_at_start;
+  var test_condition : Function;
+  var expected_value;
+  
+  // constructor
+  function Task(name, test_condition : Function, expected_value){
+    // name it
+    this.name = name;
+    // set the time at creation
+    this.ticks_at_start = Date.Now.Ticks;
+    // set the test condition
+    this.test_condition = test_condition;
+    // set expected test result value
+    this.expected_value = expected_value;
+  }
+  
+  function assert_true() : boolean {
+    return this.test_condition() == this.expected_value;
+  }
+  
+  function start(task_list : Array) {
+    task_list.push(
+      new Task(this.name, this.test_condition, this.expected_value)
+    );
+  }
+};
+
+// instanciate a new task
+var hit = new Task(
+  "hit",
+  function() {
+    return Mathf.Abs(transform.position.x - enemy.transform.position.x) < 5
+    && Mathf.Abs(transform.position.z - enemy.transform.position.z) < 5;
+  },
+  true
+);
+hit.start(tasks);
+
+// profiler funciton to check tasks for completion
+function profile() {
+  var task_count = tasks.length;
+  var task : Task;
+  var completed_tasks = Array();
+  while(task_count--) {
+    task = tasks[task_count];
+    if (task.assert_true()) {
+      var ticks = Date.Now.Ticks - task.ticks_at_start;
+      var seconds = ticks / 10000000; // million
+      var milis = (ticks - seconds * 10000000) / 1000;
+      Debug.Log("Task ["+task.name+"] completed in "+seconds+"."+milis+"m ticks");
+      completed_tasks.push(task_count); // to remove them later
+    }
+  }
+  // remove completed tasks from tasks array
+  // doing this in a reversed loop, after iterating
+  // .. otherwise we'd screw over the iterator
+  var completed_count = completed_tasks.length;
+  while(completed_count--) {
+    tasks.RemoveAt(completed_tasks[completed_count]);
   }
 }
 
