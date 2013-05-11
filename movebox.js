@@ -58,9 +58,58 @@ class State {
 };
 
 ///////////////////////////////////////
+// TASK CLASS
+// - creates an object with a name and test condition in tasks array
+// - time is recorded upon creation
+// - profile() function checks condition and kills the task
+// once the contition is met while printing time to console
+class Task {
+  var name;
+  var ticks_at_start;
+  var test_condition : Function;
+  var expected_value;
+  
+  // constructor
+  function Task(name, test_condition : Function, expected_value){
+    // name it
+    this.name = name;
+    // set the time at creation
+    this.ticks_at_start = Date.Now.Ticks;
+    // set the test condition
+    this.test_condition = test_condition;
+    // set expected test result value
+    this.expected_value = expected_value;
+  }
+  
+  function assert_true() : boolean {
+    return this.test_condition() == this.expected_value;
+  }
+  
+  function start(task_list : Array) {
+    task_list.push(
+      new Task(this.name, this.test_condition, this.expected_value)
+    );
+  }
+};
+
+///////////////////////////////////////
+// Tasks for profiling
+var hit = new Task(
+  "hit",
+  function() {
+    return Mathf.Abs(transform.position.x - enemy.transform.position.x) < 2
+    && Mathf.Abs(transform.position.z - enemy.transform.position.z) < 2;
+  },
+  true
+);
+
+///////////////////////////////////////
 // HWAI script (Harry & Will AI .. pronounced WHY?! (working title :P)
 // - Instances of objects we'll need
 // - MonoBehaviour function overrides
+
+// create an array to hold tasks for profiling
+var tasks = Array();
 
 // state enum
 enum AI_STATE { EARTH, FIRE, WATER, WIND };
@@ -240,55 +289,6 @@ function dangerDetect() : float{
 // - give it a name and time will be printed to console
 //
 
-// create an array to hold tasks
-var tasks = Array();
-
-///////////////////////////////////////
-// TASK CLASS
-// - creates an object with a name and test condition in tasks array
-// - time is recorded upon creation
-// - profile() function checks condition and kills the task
-// once the contition is met while printing time to console
-class Task {
-  var name;
-  var ticks_at_start;
-  var test_condition : Function;
-  var expected_value;
-  
-  // constructor
-  function Task(name, test_condition : Function, expected_value){
-    // name it
-    this.name = name;
-    // set the time at creation
-    this.ticks_at_start = Date.Now.Ticks;
-    // set the test condition
-    this.test_condition = test_condition;
-    // set expected test result value
-    this.expected_value = expected_value;
-  }
-  
-  function assert_true() : boolean {
-    return this.test_condition() == this.expected_value;
-  }
-  
-  function start(task_list : Array) {
-    task_list.push(
-      new Task(this.name, this.test_condition, this.expected_value)
-    );
-  }
-};
-
-// instanciate a new task
-var hit = new Task(
-  "hit",
-  function() {
-    return Mathf.Abs(transform.position.x - enemy.transform.position.x) < 5
-    && Mathf.Abs(transform.position.z - enemy.transform.position.z) < 5;
-  },
-  true
-);
-hit.start(tasks);
-
 // profiler funciton to check tasks for completion
 function profile() {
   var task_count = tasks.length;
@@ -346,6 +346,7 @@ function Update(){
   }
   if (Input.GetKey(KeyCode.Alpha2) && active_state != AI_STATE.FIRE) {
     active_state = AI_STATE.FIRE;
+    hit.start(tasks);
     Debug.Log(active_state);
   }
   if (Input.GetKey(KeyCode.Alpha3) && active_state != AI_STATE.WATER) {
