@@ -213,10 +213,9 @@ function pointToEnemy() : boolean{
 	//Project velocity vector onto d.
 	var p = Vector3.Project(rigidbody.velocity, d) - rigidbody.velocity;
 //	p += enemy.rigidbody.velocity;
-	Debug.Log(p.magnitude);
 	
 	//Velocity of enemy robot
-	var v = 1.5 * enemy.rigidbody.velocity;
+	var v = 1.5 * enemy.rigidbody.velocity * (1-Mathf.Abs(0.5-threatDetect()));
 	return pointFastToVect(d-(p*5)-v,2);
 }
 function chargeEnemy(){
@@ -228,6 +227,9 @@ function chargeEnemy(){
 function threatDetect(): float{
 	var v = (enemy.transform.position - transform.position).normalized;
 	return Vector3.Angle(v, enemy.rigidbody.velocity.normalized)/180;
+}
+function dangerDetect() : float{
+
 }
 
 ///////////////////////////////////////
