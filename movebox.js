@@ -24,7 +24,7 @@ class Arena {
 
 ///////////////////////////////////////
 // PLAYER CLASS
-// - used for Enemy and Ourself later
+// - used for quick reference to Enemy
 // - for quick access to Transform (.t) and Rigidbody (.r)
 // - constructor takes GameObject
 //
@@ -59,10 +59,13 @@ class State {
 
 ///////////////////////////////////////
 // TASK CLASS
+// - used in profiling to measure efficiency of logic used i.e. how long does
+// it take to slow to a stop using algorithm A. how long does it take to get
+// from point A to point B using algorithm XYZ, etc.
 // - creates an object with a name and test condition in tasks array
 // - time is recorded upon creation
-// - profile() function checks condition and kills the task
-// once the contition is met while printing time to console
+// - profile() function checks condition for each task on every frame and kills
+// a task once its contition has been met; printing the time it took to console
 class Task {
   var name;
   var ticks_at_start;
@@ -97,26 +100,34 @@ class Task {
 var hit = new Task(
   "hit",
   function() {
-    return Mathf.Abs(transform.position.x - enemy.transform.position.x) < 2
-    && Mathf.Abs(transform.position.z - enemy.transform.position.z) < 2;
+    return Mathf.Abs(transform.position.x - enemy.transform.position.x) < 1.5
+    && Mathf.Abs(transform.position.z - enemy.transform.position.z) < 1.5;
   },
   true
 );
+var lookright = new Task(
+  "Zoolander",
+  function() {
+    active_state != AI_STATE.ZOOLANDER;
+  },
+  true
+);
+
 
 ///////////////////////////////////////
 // HWAI script (Harry & Will AI .. pronounced WHY?! (working title :P)
 // - Instances of objects we'll need
 // - MonoBehaviour function overrides
 
-// create an array to hold tasks for profiling
+// array to hold tasks for profiling
 var tasks = Array();
 
 // state enum
-enum AI_STATE { EARTH, FIRE, WATER, WIND };
+enum AI_STATE { IDLE, EARTH, FIRE, WATER, WIND, ZOOLANDER };
 
 // variables
 var arena : Arena; // arena
-var enemy : Player; // enemy
+var enemy : GameObject; // enemy
 var states; // an array of all the states available (objects)
 var state_stack: AI_STATE; // an array of queued up states (enum)
 var active_state: AI_STATE; // state we're in currently (enum)
@@ -128,8 +139,7 @@ function Start()
   arena = new Arena(arena_object);
 
   // ref to enemy
-  var enemy_object = GameObject.Find(name == "Robot 1" ? "Robot 2" : "Robot 1");
-  enemy = new Player(enemy_object);
+  enemy = GameObject.Find(name == "Robot 1" ? "Robot 2" : "Robot 1");
 
   ///////////////////////////////////////
   // AI STATES
@@ -139,38 +149,40 @@ function Start()
   // - enumerate them
   //
   states = Array();
-  // EARTH state: holds center-stage at all cost
+  // IDLE
+  var idle = new State( function () {
+    // pick a state
+  });
+  // EARTH
   var earth = new State( function () {
     killVel();
-    // find vector to center-stage
-    // find required orientation change to face center
-    // apply orientation change
-    // move
-    // .. can be refined later
   });
-  // FIRE state: attacks .. ! or fires all employees?
+  // FIRE
   var fire = new State( function () {
     chargeEnemy();
-    // find enemy
-    // orientate to face enemy
-    // chaaaaaaaaaaarge!
-    // .. can be refined later
   });
-  // WATER state: dodge incoming attacks & retaliate
-  var water = new State( function () {
-    // .. can be defined later
+  // WATER
+  var water = new State( function () {});
+  // WIND
+  var wind = new State( function () {});
+  // ZOOLANDER
+  var zoolander = new State( function () {
+    if(
+      pointToCoords(5, 0, 0.001)
+      && rigidbody.angularVelocity.y < 0.001
+    ) {
+      active_state = AI_STATE.IDLE;
+    }
   });
-  // WIND state: avoid / evade / become invisible
-  var wind = new State( function () {
-    // hack own rigidbody functions (all of them) to return null :D
-  });
-  // add states to array. must be in order of AIState enum up top
+  // add states to array. must be in order of AI_STATE enum up top
+  states.push(idle);
   states.push(earth);
   states.push(fire);
   states.push(water);
   states.push(wind);
+  states.push(zoolander);
   // set active state on start
-  active_state = AI_STATE.EARTH;
+  active_state = AI_STATE.IDLE;
 
   // debug values
   //Debug.Log("Arena Center [X,Z]: " + a.center_x + ", " + a.center_z);
@@ -271,7 +283,7 @@ function pointToEnemy() : boolean{
 function chargeEnemy(){
   if (pointToEnemy()){
   	killRot();
-	rigidbody.AddRelativeForce(0, 0, 5*s);
+	  rigidbody.AddRelativeForce(0, 0, 5*s);
   }
 }
 function threatDetect(): float{
@@ -346,7 +358,6 @@ function Update(){
   }
   if (Input.GetKey(KeyCode.Alpha2) && active_state != AI_STATE.FIRE) {
     active_state = AI_STATE.FIRE;
-    hit.start(tasks);
     Debug.Log(active_state);
   }
   if (Input.GetKey(KeyCode.Alpha3) && active_state != AI_STATE.WATER) {
@@ -357,7 +368,11 @@ function Update(){
     active_state = AI_STATE.WIND;
     Debug.Log(active_state);
   }
-  
+  if (Input.GetKey(KeyCode.Alpha5) && active_state != AI_STATE.ZOOLANDER) {
+    active_state = AI_STATE.ZOOLANDER;
+    lookright.start(tasks);
+    Debug.Log(active_state);
+  }
   // ENEMY CONTROL
   if (Input.GetKey(KeyCode.W)){
     enemy.rigidbody.AddRelativeForce(0, 0, 5);
