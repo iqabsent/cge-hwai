@@ -199,11 +199,25 @@ function FixedUpdate() {
   //Debug.Log(active_state);
 }
 
+
+
+
 ///////////////////////////////////////
 // UTILITY FUNCTIONS
 //
-var temp_a : float = 0.05;
 var s = 1; // scaling value between 1 and -1. Allows us to change which direction we want to turn/move.
+
+function accelFor(){
+	var v = transform.position + rigidbody.velocity;
+	if(	v.x >= arena.max_x -1||
+		v.x <= arena.min_x +1||
+		v.z >= arena.max_z -1||
+		v.z <= arena.min_z +1){
+		rigidbody.AddRelativeForce(0, 0, 5*-s);
+	} else {
+		rigidbody.AddRelativeForce(0, 0, 5*s);
+	}
+}
 
 function killRot(){
   rigidbody.AddTorque(0, (5*-(rigidbody.angularVelocity.y)),0);
@@ -283,7 +297,7 @@ function pointToEnemy() : boolean{
 function chargeEnemy(){
   if (pointToEnemy()){
   	killRot();
-	  rigidbody.AddRelativeForce(0, 0, 5*s);
+	  accelFor();
   }
 }
 function threatDetect(): float{
@@ -335,7 +349,6 @@ function Update(){
   if (Input.GetKey(KeyCode.UpArrow)){
     //killRot();
     rigidbody.AddRelativeForce(0, 0, 5);
-    vel = true;
   }
   if (Input.GetKey(KeyCode.DownArrow)){
     killRot();
