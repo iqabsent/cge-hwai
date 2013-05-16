@@ -11,7 +11,6 @@ class Arena {
   var center_x;
   var center_z;
   // constructor: feed it a GameObject & it grabs values
-  // .. now autocomplete also magically works (within class)
   function Arena(arena:GameObject){
     this.min_x = arena.collider.bounds.min.x;
     this.min_z = arena.collider.bounds.min.z;
@@ -24,10 +23,11 @@ class Arena {
 
 ///////////////////////////////////////
 // PLAYER CLASS
-// - used for quick reference to Enemy
-// - for quick access to Transform (.t) and Rigidbody (.r)
+// - equally useless...
+// - could be extended to carry out operations to give us useful info on enemy
 // - constructor takes GameObject
 //
+/* // Add/remove slash to line beginning to un-/comment block
 class Player {
 
   var rigidbody : Rigidbody;
@@ -38,11 +38,11 @@ class Player {
     rigidbody = player.rigidbody;
     transform = player.transform;
   }
-};
+};//*/
 
 ///////////////////////////////////////
 // STATE CLASS
-// - serves as a container for a single function or "behaviour"
+// - serves as a container for a single "behaviour" function
 // - the idea is to have several of these and switch between them
 //
 class State {
@@ -58,22 +58,24 @@ class State {
 };
 
 ///////////////////////////////////////
-// TASK CLASS
+// TEST CLASS
 // - used in profiling to measure efficiency of logic used i.e. how long does
 // it take to slow to a stop using algorithm A. how long does it take to get
 // from point A to point B using algorithm XYZ, etc.
-// - creates an object with a name and test condition in tasks array
+// - creates an object with a name and test condition
 // - time is recorded upon creation
-// - profile() function checks condition for each task on every frame and kills
-// a task once its contition has been met; printing the time it took to console
-class Task {
+// - an external profile() function checks condition for each test on every
+//   frame and kills a test once its contition has been met. The time taken to
+//   complete the test is printed to console
+//
+class Test {
   var name;
   var ticks_at_start;
   var test_condition : Function;
   var expected_value;
   
   // constructor
-  function Task(name, test_condition : Function, expected_value){
+  function Test(name, test_condition : Function, expected_value){
     // name it
     this.name = name;
     // set the time at creation
@@ -88,16 +90,16 @@ class Task {
     return this.test_condition() == this.expected_value;
   }
   
-  function start(task_list : Array) {
-    task_list.push(
-      new Task(this.name, this.test_condition, this.expected_value)
+  function start(test_list : Array) {
+    test_list.push(
+      new Test(this.name, this.test_condition, this.expected_value)
     );
   }
 };
 
 ///////////////////////////////////////
-// Tasks for profiling
-var hit = new Task(
+// Tests for profiling
+var hit = new Test(
   "hit",
   function() {
     return Mathf.Abs(transform.position.x - enemy.transform.position.x) < 1.5
@@ -105,7 +107,7 @@ var hit = new Task(
   },
   true
 );
-var lookright = new Task(
+var lookright = new Test(
   "Zoolander",
   function() {
     active_state != AI_STATE.ZOOLANDER;
@@ -119,11 +121,11 @@ var lookright = new Task(
 // - Instances of objects we'll need
 // - MonoBehaviour function overrides
 
-// array to hold tasks for profiling
-var tasks = Array();
+// array to hold tests for profiling
+var tests = Array();
 
 // state enum
-enum AI_STATE { IDLE, EARTH, FIRE, WATER, WIND, ZOOLANDER };
+enum AI_STATE { IDLE, GRASSHOPPER, EARTH, FIRE, WATER, WIND, ZOOLANDER, PLANET };
 
 // variables
 var arena : Arena; // arena
@@ -131,7 +133,8 @@ var enemy : GameObject; // enemy
 var states; // an array of all the states available (objects)
 var state_stack: AI_STATE; // an array of queued up states (enum)
 var active_state: AI_STATE; // state we're in currently (enum)
-
+var last = 0; // time check
+var rot_per_tor = 0; // rotation we get off of angular velocity of 1
 function Start()
 {
   // arena values
@@ -152,6 +155,19 @@ function Start()
   // IDLE
   var idle = new State( function () {
     // pick a state
+  });
+  // GRASSHOPPER
+  var grasshopper = new State( function () {
+    // learn the **** out of this world
+    if(!rigidbody.angularVelocity.magnitude) {
+      rigidbody.AddTorque(0,1,0);
+    } else if(!rot_per_tor){
+Debug.Log(rigidbody.rotation.eulerAngles.y);
+      rot_per_rot = rigidbody.rotation.eulerAngles.y;
+    } else {
+      active_state = AI_STATE.IDLE;
+Debug.Log(rot_per_tor);
+    }
   });
   // EARTH
   var earth = new State( function () {
@@ -174,15 +190,24 @@ function Start()
       active_state = AI_STATE.IDLE;
     }
   });
+  // PLANET
+  var planet = new State( function () {
+    rigidbody.angularVelocity.y = 0.2;
+    var current = Vector3.Angle(transform.forward,Vector3(0,0,1)) * Time.deltaTime;
+Debug.Log(current - last);
+    last = current;
+  });
   // add states to array. must be in order of AI_STATE enum up top
   states.push(idle);
+  states.push(grasshopper);
   states.push(earth);
   states.push(fire);
   states.push(water);
   states.push(wind);
   states.push(zoolander);
+  states.push(planet);
   // set active state on start
-  active_state = AI_STATE.IDLE;
+  active_state = AI_STATE.GRASSHOPPER;
 
   // debug values
   //Debug.Log("Arena Center [X,Z]: " + a.center_x + ", " + a.center_z);
@@ -204,6 +229,19 @@ function FixedUpdate() {
 //
 var temp_a : float = 0.05;
 var s = 1; // scaling value between 1 and -1. Allows us to change which direction we want to turn/move.
+
+function accelFor(){
+
+ var v = transform.position + rigidbody.velocity;
+ if( v.x >= arena.max_x ||
+  v.x <= arena.min_x ||
+  v.z >= arena.max_z ||
+  v.z <= arena.min_z){
+  rigidbody.AddRelativeForce(0, 0, 5*-s);
+ } else {
+  rigidbody.AddRelativeForce(0, 0, 5*s);
+ }
+}
 
 function killRot(){
   rigidbody.AddTorque(0, (5*-(rigidbody.angularVelocity.y)),0);
@@ -282,8 +320,8 @@ function pointToEnemy() : boolean{
 }
 function chargeEnemy(){
   if (pointToEnemy()){
-  	killRot();
-	  rigidbody.AddRelativeForce(0, 0, 5*s);
+   killRot();
+   accelFor();
   }
 }
 function threatDetect(): float{
@@ -301,27 +339,27 @@ function dangerDetect() : float{
 // - give it a name and time will be printed to console
 //
 
-// profiler funciton to check tasks for completion
+// profiler funciton to check tests for completion
 function profile() {
-  var task_count = tasks.length;
-  var task : Task;
-  var completed_tasks = Array();
-  while(task_count--) {
-    task = tasks[task_count];
-    if (task.assert_true()) {
-      var ticks = Date.Now.Ticks - task.ticks_at_start;
+  var test_count = tests.length;
+  var test : Test;
+  var completed_tests = Array();
+  while(test_count--) {
+    test = tests[test_count];
+    if (test.assert_true()) {
+      var ticks = Date.Now.Ticks - test.ticks_at_start;
       var seconds = ticks / 10000000; // million
       var milis = (ticks - seconds * 10000000) / 1000;
-      Debug.Log("Task ["+task.name+"] completed in "+seconds+"."+milis+"m ticks");
-      completed_tasks.push(task_count); // to remove them later
+      Debug.Log("Test ["+test.name+"] completed in "+seconds+"."+milis+"m ticks");
+      completed_tests.push(test_count); // to remove them later
     }
   }
-  // remove completed tasks from tasks array
+  // remove completed tests from tests array
   // doing this in a reversed loop, after iterating
   // .. otherwise we'd screw over the iterator
-  var completed_count = completed_tasks.length;
+  var completed_count = completed_tests.length;
   while(completed_count--) {
-    tasks.RemoveAt(completed_tasks[completed_count]);
+    tests.RemoveAt(completed_tests[completed_count]);
   }
 }
 
@@ -370,7 +408,11 @@ function Update(){
   }
   if (Input.GetKey(KeyCode.Alpha5) && active_state != AI_STATE.ZOOLANDER) {
     active_state = AI_STATE.ZOOLANDER;
-    lookright.start(tasks);
+    lookright.start(tests);
+    Debug.Log(active_state);
+  }
+  if (Input.GetKey(KeyCode.Alpha6) && active_state != AI_STATE.PLANET) {
+    active_state = AI_STATE.PLANET;
     Debug.Log(active_state);
   }
   // ENEMY CONTROL
